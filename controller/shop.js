@@ -11,7 +11,6 @@ let transporter = nodemailer.createTransport({
   },
 });
 exports.addToCart = (req, res, next) => {
-  console.log(req.query);
   const prodId = req.query.idProduct;
   const userId = req.query.idUser;
   const count = req.query.count;
@@ -21,10 +20,9 @@ exports.addToCart = (req, res, next) => {
         res.status(401).json({ message: "you need to login" });
         return;
       }
-      console.log(user);
+
       Products.findById(prodId)
         .then((product) => {
-          console.log(product);
           return user.addToCart(product, count);
         })
         .catch((err) => console.log(err));
@@ -67,15 +65,28 @@ exports.postOrder = (req, res, next) => {
         .populate("user.userId")
         .populate("products.product")
         .then((cart) => {
+          let order;
+          if (!cart) {
+            order = new Order({
+              user: {
+                address: req.body.user.address,
+                userId: user,
+              },
+              products: products,
+            });
+            res.status(200).json({ message: "ORDER SUCCESS!!" });
+            order.save();
+            return;
+          }
           if (cart.user.userId._id.toString() === userId) {
             cart.products = cart.products.concat(products);
             res.status(200).json({ message: "ORDER SUCCESS!!" });
             return cart.save();
           } else {
-            const order = new Order({
+            order = new Order({
               user: {
                 address: req.body.user.address,
-                userId: userId,
+                userId: user,
               },
               products: products,
             });
@@ -140,10 +151,8 @@ exports.getOrders = (req, res, next) => {
 
 exports.historiesDetail = (req, res, next) => {
   const id = req.params.id;
-  console.log(id);
+
   Order.findById(id)
-    .populate("user.userId")
-    .populate("products")
     .then((orders) => {
       /*  const data = JSON.stringify(orders); */
       let sub_total = 0;
@@ -169,10 +178,9 @@ exports.deleteCart = (req, res, next) => {
         res.status(401).json({ message: "you need to signup" });
         return;
       }
-      console.log(user);
+
       Products.findById(prodId)
         .then((product) => {
-          console.log(product);
           return user.removeFromCart(prodId);
         })
         .catch((err) => console.log(err));
@@ -180,4 +188,27 @@ exports.deleteCart = (req, res, next) => {
     .catch((err) => {
       console.log(err);
     });
+};
+exports.historiesAll = (req, res, next) => {
+  Order.find()
+    .populate("user.userId")
+    .then((order) => {
+      let test = [];
+
+      const allUser = order.map((el) => {
+  
+
+        const test2 = el.products.map((e) => {
+         
+          test.push({
+            user: el.user.userId,
+            totalPrice: parseInt(+e.product.price) * parseInt(e.quantity),
+            address: el.user.address,
+          });
+        });
+      });
+     
+      res.status(200).json(test);
+    })
+    .catch((er) => console.log(er));
 };

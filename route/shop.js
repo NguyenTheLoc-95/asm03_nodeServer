@@ -9,6 +9,7 @@ route.delete('/carts/delete', shopController.deleteCart);
 route.post('/create-order', shopController.postOrder);
 route.get('/orders', shopController.getOrders);
 route.get('/histories/:id', shopController.historiesDetail);
+route.get('/all-histories', shopController.historiesAll);
 
 
 

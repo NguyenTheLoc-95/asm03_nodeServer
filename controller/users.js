@@ -77,6 +77,7 @@ exports.postLogin = (req, res, next) => {
 exports.postLoginAdmin = (req, res, next) => {
   const email = req.body.user.email;
   const password = req.body.user.password;
+  console.log(email)
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     /*    console.log(errors.array()) */
