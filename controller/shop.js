@@ -5,14 +5,15 @@ const nodemailer = require("nodemailer");
 let transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: "587",
+
   auth: {
     user: "locntfx20150@funix.edu.vn",
-    pass: "rWcTNTcfV390",
+    pass: "Locnguyen@95",
   },
 });
 exports.addToCart = (req, res, next) => {
   const prodId = req.query.idProduct;
-  const userId = req.query.idUser;
+  const userId = req?.user?._id;
   const count = req.query.count;
   User.findById(userId)
     .then((user) => {
@@ -23,6 +24,7 @@ exports.addToCart = (req, res, next) => {
 
       Products.findById(prodId)
         .then((product) => {
+          res.status(200).json({ message: "ADD SUCCESS" });
           return user.addToCart(product, count);
         })
         .catch((err) => console.log(err));
@@ -32,20 +34,52 @@ exports.addToCart = (req, res, next) => {
     });
 };
 exports.getCart = (req, res, next) => {
-  const id = req.query.idUser;
+  const id = req?.user?._id;
+  /* if (!id) {
+    res.status(401).json({ message: "you need to Login" });
+    return;
+  } */
   User.findById(id)
     .populate("cart.items.productId")
     .then((cart) => {
       if (!cart) {
-        res.status(401).json({ message: "you need to Login" });
+        res.status(401).json({ message: "Bạn đã hết phiên xin đăng nhập lại!" });
         return;
       }
       return res.status(200).json(cart.cart.items);
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+};
+
+exports.updateCart = (req, res, next) => {
+  const prodId = req.query.idProduct;
+
+  const userId = req?.user?._id;
+  const count = req.query.count;
+
+  User.findById(userId)
+    .then((user) => {
+      if (!user) {
+        res.status(401).json({ message: "you need to login" });
+        return;
+      }
+
+      Products.findById(prodId)
+        .then((product) => {
+          res.status(200).json({ message: "FIX SUCCESS" });
+          return user.addToCart(product, count);
+        })
+        .catch((err) => console.log(err));
+    })
+    .catch((err) => {
+      console.log(err);
     });
 };
 
 exports.postOrder = (req, res, next) => {
-  const userId = req.body.user.idUser;
+  const userId = req?.user?._id;
   const phone = req.body.user.phone;
   const address = req.body.user.address;
   const fullname = req.body.user.fullname;
@@ -61,46 +95,34 @@ exports.postOrder = (req, res, next) => {
       const products = user.cart.items.map((i) => {
         return { quantity: i.quantity, product: { ...i.productId._doc } };
       });
-      Order.findOne()
-        .populate("user.userId")
+      Order.findOne({ user: userId })
+        .populate("user")
         .populate("products.product")
         .then((cart) => {
           let order;
           if (!cart) {
             order = new Order({
-              user: {
-                address: req.body.user.address,
-                userId: user,
-              },
+              phone: phone,
+              address: address,
+              user: user,
               products: products,
             });
             res.status(200).json({ message: "ORDER SUCCESS!!" });
             order.save();
             return;
           }
-          if (cart.user.userId._id.toString() === userId) {
+          if (cart.user._id.toString() === userId.toString()) {
             cart.products = cart.products.concat(products);
             res.status(200).json({ message: "ORDER SUCCESS!!" });
             return cart.save();
-          } else {
-            order = new Order({
-              user: {
-                address: req.body.user.address,
-                userId: user,
-              },
-              products: products,
-            });
-            res.status(200).json({ message: "ORDER SUCCESS!!" });
-
-            return order.save();
           }
         })
         .then((el) => {
           let sum = 0;
-          products.map((value) => {
-            return (sum +=
-              parseInt(value.product.price) * parseInt(value.quantity));
-          });
+          products.map(
+            (value) =>
+              (sum += parseInt(value.product.price) * parseInt(value.quantity))
+          );
           return transporter
             .sendMail({
               to: email,
@@ -135,13 +157,15 @@ exports.postOrder = (req, res, next) => {
     .catch((err) => console.log(err));
 };
 exports.getOrders = (req, res, next) => {
-  Order.find({ "user.userId": req.query.idUser })
-    .populate("user.userId")
+  Order.findOne({ user: req?.user?._id })
+    .populate("user")
     .populate("products")
     .then((orders) => {
       if (!orders) {
         res.status(401).json({ message: "you need to Login" });
+        return;
       }
+
       const data = JSON.stringify(orders);
 
       res.status(200).json(data);
@@ -151,18 +175,29 @@ exports.getOrders = (req, res, next) => {
 
 exports.historiesDetail = (req, res, next) => {
   const id = req.params.id;
+  const user = req?.user?._id;
 
-  Order.findById(id)
+  Order.findOne({ user: user })
+    .populate("user")
     .then((orders) => {
+      if (!orders) {
+        res.status(401).json({ message: "You need to Login!" });
+        return;
+      }
       /*  const data = JSON.stringify(orders); */
       let sub_total = 0;
       orders.products.map((el) => {
         sub_total += parseInt(+el.product.price) * parseInt(el.quantity);
       });
+      const product = orders.products.find(
+        (el) => el.product._id.toString() === id
+      );
+
       return res.status(200).json({
         total: sub_total,
         user: orders.user,
-        product: orders.products,
+        product: product,
+        address: orders.address,
       });
     })
     .catch((err) => console.log(err));
@@ -170,45 +205,54 @@ exports.historiesDetail = (req, res, next) => {
 
 exports.deleteCart = (req, res, next) => {
   const prodId = req.query.idProduct;
-  const userId = req.query.idUser;
+  const userId = req?.user?._id;
 
   User.findById(userId)
     .then((user) => {
       if (!user) {
-        res.status(401).json({ message: "you need to signup" });
+        res.status(401).json({ message: "you need to signin" });
         return;
       }
-
-      Products.findById(prodId)
+      res.status(200).json({ message: "DELETE PRODUCT SUCCESS" });
+      return user.removeFromCart(prodId);
+      /*  Products.findById(prodId)
         .then((product) => {
-          return user.removeFromCart(prodId);
+          
         })
-        .catch((err) => console.log(err));
+        .catch((err) => console.log(err)); */
     })
     .catch((err) => {
       console.log(err);
     });
 };
 exports.historiesAll = (req, res, next) => {
-  Order.find()
-    .populate("user.userId")
-    .then((order) => {
-      let test = [];
+  const userId = req.query.idUser;
+  console.log(userId);
+  User.findById(userId)
+    .then((user) => {
+      if (!user) {
+        res.status(401).json({ message: "you need to signin" });
+        return;
+      }
+      Order.find()
+        .populate("user")
+        .then((order) => {
+          let test = [];
 
-      const allUser = order.map((el) => {
-  
-
-        const test2 = el.products.map((e) => {
-         
-          test.push({
-            user: el.user.userId,
-            totalPrice: parseInt(+e.product.price) * parseInt(e.quantity),
-            address: el.user.address,
+          const allUser = order.map((el) => {
+            const test2 = el.products.map((e) => {
+              test.push({
+                user: el.user,
+                totalPrice: parseInt(+e.product.price) * parseInt(e.quantity),
+                address: el.address,
+                phone: el.phone,
+              });
+            });
           });
-        });
-      });
-     
-      res.status(200).json(test);
+
+          res.status(200).json(test);
+        })
+        .catch((er) => console.log(er));
     })
     .catch((er) => console.log(er));
 };

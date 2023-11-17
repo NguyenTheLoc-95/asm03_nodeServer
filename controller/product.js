@@ -1,6 +1,7 @@
 const Products = require("../model/product");
 
 exports.getProducts = (req, res, next) => {
+ console.log(req.session)
   Products.find().then((product) => {
     res.status(200).json(product);
   });
@@ -26,14 +27,15 @@ exports.addProduct = (req, res, next) => {
   const shortDes = req.query.shortDes;
   const longDes = req.query.longDes;
   const image = req.files;
-  console.log(image);
-  if (!image || image.length < 3) {
+
+
+  if (!image || image.length <= 4) {
     res.status(401).json({
-      message: "The file format to upload will be 5 file JPG or PNG or JPEG",
+      message: "The file format to upload will must be 5 file JPG or PNG or JPEG",
     });
     return;
   }
-  const imageUrl = "http://localhost:5000/";
+  const imageUrl = "https://server-asm3.onrender.com/";
 
   const product = new Products({
     category: category,
@@ -59,7 +61,7 @@ exports.addProduct = (req, res, next) => {
     });
 };
 exports.editProduct = (req,res,next)=>{
-  console.log(req.body)
+
   const prodId = req.body.id;
   const updatedName = req.body.name;
   const updatedShort= req.body.shortDes;

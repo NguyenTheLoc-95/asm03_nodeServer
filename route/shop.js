@@ -10,6 +10,8 @@ route.post('/create-order', shopController.postOrder);
 route.get('/orders', shopController.getOrders);
 route.get('/histories/:id', shopController.historiesDetail);
 route.get('/all-histories', shopController.historiesAll);
+route.post('/carts/update', shopController.updateCart);
+
 
 
 
